@@ -4,7 +4,7 @@ The given picture is the picture of the National cadet Corps residency present i
 
 To find it just search NCC,IIT ISM and you will find the exact image  on Google Maps.
 
-![[./img/pic1.png]]
+![image](https://github.com/bitcriminals/JadeCTF-Writeups/blob/main/osint/img/pic1.png)
 
 So, the flag is - **jadeCTF{national_cadet_corps_23.818_86.437}**
 
@@ -22,13 +22,13 @@ You can visit any instagram or twitter and search for concetto,iitism and there 
 Now,if you visit the linkedin profile of one of the authors,you will find a suspicious comment 
 that suggests you to look for Jade from ISM.
 
-![[./img/pic2.png]]
+![image](https://github.com/bitcriminals/JadeCTF-Writeups/blob/main/osint/img/pic2.png)
 
 Now look for Jade from ISM and you'll find a twitter account.
 
 Form the twitter account of Jade you'll find this.
 
-![[./img/pic3.png]]
+![image](https://github.com/bitcriminals/JadeCTF-Writeups/blob/main/osint/img/pic3.png)
 
 Now, if you look into this twitter,you'll find a post that says **Look into the past**.
 
