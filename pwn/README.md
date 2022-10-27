@@ -1,6 +1,6 @@
 # BABY PWN
 We are given a binary.  
-On analysin it with Ghidra, we find the `start_program()` function:
+On analyzing it with Ghidra, we find the `start_program()` function:
 ```c
 void start_program(void)
 
