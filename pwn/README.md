@@ -326,3 +326,5 @@ gcc -nostdlib -static "$1" -o shellcode
 objcopy --dump-section .text=shellcode.bin shellcode
 rm shellcode
 ```
+
+FLAG: `jadeCTF{sh3llc0ding_but_w1th_4_tw1st}`
