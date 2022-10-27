@@ -32,7 +32,7 @@ ct = pow(flag, e, N)
 assert pow(ct, d, N) == flag
 ```
 
-At at glance:
+At a glance:
 - basic RSA public / priv key setup, with the 256 bit primes!
 - two random variables - x, y around 240 bits
 - four equations involving x, y, p & q
@@ -64,7 +64,7 @@ N ^ {240/512} \approx N ^ {1/2 - \epsilon} \\
 \end{align}
 $$
 
-Similary we find `y`.
+Similarly we find `y`,
 ```python
 F.<x> = PolynomialRing(Zmod(N))
 FF = (e * x + A) ^ 2 - X
@@ -149,10 +149,11 @@ Flag is  `jadeCTF{mithril_is_peril_why_not_copper_with_gcd?}`
 
 The main security element of this steam cipher is its registers which are clocked irregularly. At every cycle atleast 2 of the 3 registers are clocked, using a majority rule based upon the middle bits of the registers.
 
-![[1280px-A5-1_GSM_cipher.png]]
+![](img/1280px-A5-1_GSM_cipher.png)
 
 There has been ton of research that show recovering the state of the registers given a output stream, but none that runs in reasonable amount of time for a ctf. 
->The author spent a good 6-8 hrs looking for a working exploit but couldn't find one
+>The author spent a good 6-8 hrs looking for a working exploit but couldn't find one.
+
 > So he did the next most reasonable thing. Introduce a not so obvious bug.
 
 ```python
@@ -297,7 +298,7 @@ else:
 	print("failed")
 ```
 
-the script above recovers the state using z3! To get the plaintext back, reinstantiate a new LFSR and manually set the registers to these recovered states. The bitstream produces in the output should xor with the ciphertext to give the flag!
+the script above recovers the state using z3! To get the plaintext back, reinstantiate a new LFSR and manually set the registers to these recovered states. The bitstream produced in the output should xor with the ciphertext to give the flag!
 
 > The prompt stated that the flag was not in the beginning of the encrypted string
 
@@ -316,7 +317,8 @@ Flag is `jadeCTF{a5/1__is_good_enough_as_long_as__its_clocked_correctly}`
 The algorithm is simple enough, we have two matrices from $GL_2(Z_n)$. They are used to generate some public key elements and one of the matrices is kept private.
 
 The attack perspective comes from the 2x2 nature of the scheme. As per Cayley-Hamilton Theorem every square matrix A over a commutative ring, satisfies its own characteristic polynomial, $det(A - x * I_n)$
-If n=2, the polynomial is quadratic and its turn out that any power of A can be expressed as a linear combination of $A$ and $I_2$
+
+If n=2, the polynomial is quadratic and it turns out that any power of A can be expressed as a linear combination of $A$ and $I_2$
 
 >challenge was Minecraft themed, but has no relation to the game
 

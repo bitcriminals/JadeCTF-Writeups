@@ -1,7 +1,7 @@
 # JadeCTF-Writeups
 Official Writeups for JadeCTF' 22
 
-## crypto
+## [crypto](/crypto/)
 
 - [x] [Cheap Mithril](/crypto/cheap_mithril) - Masrt
 - [x] [Inverse or Not](/crypto/inverse_or_not) - Masrt
@@ -16,15 +16,15 @@ Official Writeups for JadeCTF' 22
 - [ ] Bit Set Go - v1per
 - [ ] Denji ex-makima - v1per
 
-## dfir
+## [dfir](/dfir/)
 
-- [ ] LM10 - Archi
-- [ ] AutoCAD - Archi
-- [ ] Call Sandeep - Archi
-- [ ] La Tour - Archi
-- [ ] Affair - Archi
+- [x] LM10 - Archi
+- [x] AutoCAD - Archi
+- [x] Call Sandeep - Archi
+- [x] La Tour - Archi
+- [x] Affair - Archi
 
-## pwn
+## [pwn](/pwn/)
 
 - [x] [Baby Pwn](/pwn/baby_pwn) - v1per
 - [ ] Love Calculator - v1per
@@ -40,20 +40,25 @@ Official Writeups for JadeCTF' 22
 - [ ] Green Coffee - Al13n
 - [ ] HAAS - Al13n
 
-## misc
+## [misc](/misc/)
 
 - [ ] Coin Flip - v1per
 - [ ] Game of Chance - Masrt & Al13n
 - [ ] Riddle me this - v1per
-- [ ] gPOW - Masrt
+- [x] [gPOW](/misc/gPOW/) - Masrt
 - [ ] SCP - Al13n & v1per
-- [ ] Secure Terminal - I M NoOne
+- [x] Secure Terminal - I M NoOne
 - [ ] Discord - penguin
 
-## osint
+## [osint](/osint/)
 
 - [ ] Heritage - Al13n
-- [ ] Banged up Abroad - Archi
+- [x] Banged up Abroad - Archi
 - [ ] AES EDAJ - Al13n
-- [ ] Chori Kar Liya - Archi
+- [x] Chori Kar Liya - Archi
 - [ ] The Global Friend - Al13n
+
+## [steg](/steg/)
+
+- [x] Avenger's Assemble - Archi
+- [x] Mojojojo - Archi
