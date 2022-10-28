@@ -27,10 +27,10 @@ Official Writeups for JadeCTF' 22
 ## [pwn](/pwn/)
 
 - [x] [Baby Pwn](/pwn/baby_pwn) - v1per
-- [ ] Love Calculator - v1per
+- [x] [Love Calculator](/pwn/love_calculator) - v1per
 - [x] [Data Storage](/pwn/data_storage) - v1per
 - [ ] Roll the Dice - v1per
-- [ ] Guess Game - v1per
+- [x] [Guess Game](/pwn/guess_game) - v1per
 
 ## web
 

